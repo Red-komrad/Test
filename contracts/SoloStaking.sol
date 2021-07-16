@@ -7,6 +7,13 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 contract SoloStacking is Ownable{
     using SafeMath for uint256;
 
+    address public constant WETH =
+        address(0x24572F0e83D6cF79F60495c6eE05e0556D38ad83);
+    address public constant SwapRouter =
+        address(0xE5CFF588c5225d5519b6a9C53d05B1c8Fdd65D17);
+    address public constant SwapFactory =
+        address(0x5d86475e1FC3788D6DaD39fAcB25241587c90698);
+
     struct Stake{
         uint256 releaseTime;
         uint256 reward;
@@ -34,6 +41,14 @@ contract SoloStacking is Ownable{
     event tokenDonated(address indexed sender, uint256 amount);
     event tokenStaked(address indexed token, address indexed staker, uint256 amount);
     event rewardClaimed(address indexed token, address indexed staker, uint256 amount);
+    event APYChanged(uint256 value);
+    event APYBonus7Changed(uint256 value);
+    event APYBonus14Changed(uint256 value);
+    event APYBonus30Changed(uint256 value);
+    event APYBonus60Changed(uint256 value);
+    event APYBonus180Changed(uint256 value);
+    event APYBonus300Changed(uint256 value);
+    event tokensBurned(address destination, uint256 amount);
 
     function stake(uint256 _amount, uint256 _delay) external payable{
         require(_delay < MIN_PERIOD, 'period cannot be less than 7 days');
@@ -70,12 +85,15 @@ contract SoloStacking is Ownable{
 
                 IERC20(token).transferFrom(address(this), msg.sender, stakers[msg.sender][token][i].reward);
 
+                totalSoldTokens[token] = totalSoldTokens[token].sub(stakers[msg.sender][token][i].reward);
+
                 emit rewardClaimed(token, msg.sender, stakers[msg.sender][token][i].reward);
             }
         }
     }
 
     function donateTokens(uint256 amount) external payable{
+
         IERC20(token).transfer(address(this), amount);
 
         totalAvailableTokens[token] = totalAvailableTokens[token].add(amount);
@@ -112,6 +130,15 @@ contract SoloStacking is Ownable{
     }
 
     ///ADMINISTRATION
+    
+    function burnTokens(address token, address destination) external onlyOwner{
+        availableTokens = totalAvailableTokens[token].sub(totalSoldTokens[token]);
+
+        IERC20(token).transfer(destination, availableTokens);
+
+        emit tokensBurned(destination, availableTokens);
+    }
+
     function changeToken(address newToken) external onlyOwner{
         require(newToken !=address(0), 'New token address cannot be zero');
 
@@ -131,5 +158,59 @@ contract SoloStacking is Ownable{
         emit OwnershipTransferred(msg.sender, newOwner);
     }
 
+    function changeAPY(uint256 _APY) external onlyOwner{
+
+        APY = _APY;
+
+        emit APYChanged(_APY);
+    }
+
+    function changeAPYBonus7(uint256 _APY) external onlyOwner{
+
+        APYBonus_7 = _APY;
+
+        emit APYChanged(_APY);
+    }
+    
+
+    function changeAPYBonus14(uint256 _APY) external onlyOwner{
+
+        APYBonus_14 = _APY;
+
+        emit APYChanged(_APY);
+    }
+    
+
+    function changeAPYBonus30(uint256 _APY) external onlyOwner{
+
+        APYBonus_30 = _APY;
+
+        emit APYChanged(_APY);
+    }
+    
+
+    function changeAPYBonus60(uint256 _APY) external onlyOwner{
+
+        APYBonus_60 = _APY;
+
+        emit APYChanged(_APY);
+    }
+    
+
+    function changeAPYBonus180(uint256 _APY) external onlyOwner{
+
+        APYBonus_180 = _APY;
+
+        emit APYChanged(_APY);
+    }
+    
+
+    function changeAPYBonus300(uint256 _APY) external onlyOwner{
+
+        APYBonus_300 = _APY;
+
+        emit APYChanged(_APY);
+    }
+    
     
 }
