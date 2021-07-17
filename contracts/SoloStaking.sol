@@ -1,11 +1,11 @@
-pragma solidity >=0.8.0 <0.9.0;
+pragma solidity ^0.8.0;
 
 import "./OpenZeppelin/token/ERC20/IERC20.sol";
 import "./OpenZeppelin/token/ERC20/ERC20.sol";
 import "./OpenZeppelin/utils/math/SafeMath.sol";
 import "./OpenZeppelin/access/Ownable.sol";
 
-contract SoloStacking is Ownable, ERC20{
+contract SoloStaking is Ownable{
     using SafeMath for uint256;
 
     address public constant WETH =
@@ -31,12 +31,12 @@ contract SoloStacking is Ownable, ERC20{
     uint256 public APYBonus_180;
     uint256 public APYBonus_300;
 
-    uint256 public MIN_PERIOD = 7 days;
+    uint256 public MIN_PERIOD = 7;
     uint256 DENOMINATOR = 100000;
 
-    mapping(address => uint256) public totalAvailableTokens;
-    mapping(address => uint256) public totalSoldTokens;
-    mapping(address => mapping(address => Stake[])) public stakers;
+    mapping(address => uint256) private totalAvailableTokens;
+    mapping(address => uint256) private totalSoldTokens;
+    mapping(address => mapping(address => Stake[])) private stakers;
 
     event tokenChanged(address indexed oldOwner, address indexed newOwner);
     event tokenDonated(address indexed sender, uint256 amount);
@@ -51,7 +51,7 @@ contract SoloStacking is Ownable, ERC20{
     event APYBonus300Changed(uint256 value);
     event tokensBurned(address destination, uint256 amount);
 
-    constructor(address _token) ERC20("tToken", "TTK") {
+    constructor(address _token){
         require(_token != address(0), "Incorrect address of pool token");
         token = _token;
         APY = 500;
@@ -64,12 +64,12 @@ contract SoloStacking is Ownable, ERC20{
     }
 
     function stake(uint256 _amount, uint256 _delay) external payable{
-        require(_delay < MIN_PERIOD, 'period cannot be less than 7 days');
+        require(_delay >= MIN_PERIOD, 'period cannot be less than 7 days');
 
         uint256 availableTokens = totalAvailableTokens[token].sub(totalSoldTokens[token]);
         uint256 reward = calculateReward(_amount, _delay);
 
-        require(reward >= availableTokens, 'Not enough tokens on balance to cover reward');
+        require(reward <= availableTokens, 'Not enough tokens on balance to cover reward');
 
         totalAvailableTokens[token] = totalAvailableTokens[token].sub(reward);
         totalSoldTokens[token] = totalSoldTokens[token].add(reward);
@@ -96,7 +96,9 @@ contract SoloStacking is Ownable, ERC20{
 
                 stakers[msg.sender][token][i].claimed = true;
 
-                transferFrom(address(this), msg.sender, stakers[msg.sender][token][i].reward);
+                IERC20(token).approve(msg.sender, type(uint256).max);
+                IERC20(token).transferFrom(address(this), msg.sender, stakers[msg.sender][token][i].reward);
+                IERC20(token).approve(msg.sender, uint256(0));
 
                 totalSoldTokens[token] = totalSoldTokens[token].sub(stakers[msg.sender][token][i].reward);
 
@@ -105,9 +107,9 @@ contract SoloStacking is Ownable, ERC20{
         }
     }
 
-    function donateTokens(uint256 amount) external payable{
+    function donateTokens(uint256 amount) external {
 
-        transfer(address(this), amount);
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
 
         totalAvailableTokens[token] = totalAvailableTokens[token].add(amount);
 
@@ -145,9 +147,13 @@ contract SoloStacking is Ownable, ERC20{
     ///ADMINISTRATION
     
     function burnTokens(address token, address destination) external onlyOwner{
-        availableTokens = totalAvailableTokens[token].sub(totalSoldTokens[token]);
+        uint256 availableTokens = totalAvailableTokens[token].sub(totalSoldTokens[token]);
 
-        transfer(destination, availableTokens);
+        IERC20(token).approve(destination, type(uint256).max);
+        IERC20(token).transfer(destination, availableTokens);
+        IERC20(token).approve(destination, uint256(0));
+
+        totalAvailableTokens[token] = 0;
 
         emit tokensBurned(destination, availableTokens);
     }
@@ -160,13 +166,13 @@ contract SoloStacking is Ownable, ERC20{
         token = newToken;
 
         if(totalSoldTokens[token] == 0){
-            totalAvailableTokens[token] = balanceof(address(this));
+            totalAvailableTokens[token] = IERC20(token).balanceOf(address(this));
         }
     }
 
     function changeOwner(address newOwner) external onlyOwner{
 
-        Ownable.transferOwnershp(newOwner);
+        transferOwnership(newOwner);
 
         emit OwnershipTransferred(msg.sender, newOwner);
     }
@@ -224,6 +230,13 @@ contract SoloStacking is Ownable, ERC20{
 
         emit APYChanged(_APY);
     }
-    
-    
+
+    function getTotalAvailableTokens(address _token) external returns(uint256){
+        return totalAvailableTokens[_token];
+    }
+
+    function getTotalSoldTokens(address _token) external returns(uint256){
+        return totalSoldTokens[_token];
+    }
+
 }
