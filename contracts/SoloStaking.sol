@@ -23,16 +23,16 @@ contract SoloStaking is Ownable{
 
     address public token;
 
-    uint256 public APY;
-    uint256 public APYBonus_7;
-    uint256 public APYBonus_14;
-    uint256 public APYBonus_30;
-    uint256 public APYBonus_60;
-    uint256 public APYBonus_180;
-    uint256 public APYBonus_300;
+    uint256 private APY;
+    uint256 private APYBonus_7;
+    uint256 private APYBonus_14;
+    uint256 private APYBonus_30;
+    uint256 private APYBonus_60;
+    uint256 private APYBonus_180;
+    uint256 private APYBonus_300;
 
-    uint256 public MIN_PERIOD = 7;
-    uint256 DENOMINATOR = 100000;
+    uint256 private MIN_PERIOD = 7;
+    uint256 private DENOMINATOR = 100000;
 
     mapping(address => uint256) private totalAvailableTokens;
     mapping(address => uint256) private totalSoldTokens;
@@ -63,7 +63,7 @@ contract SoloStaking is Ownable{
         APYBonus_300 = 30000;
     }
 
-    function stake(uint256 _amount, uint256 _delay) external payable{
+    function stake(uint256 _amount, uint256 _delay) external {
         require(_delay >= MIN_PERIOD, 'period cannot be less than 7 days');
 
         uint256 availableTokens = totalAvailableTokens[token].sub(totalSoldTokens[token]);
@@ -84,7 +84,7 @@ contract SoloStaking is Ownable{
         emit tokenStaked(token, msg.sender, _amount);
     }
 
-    function collectRewards() external payable{
+    function collectRewards() external{
         for(
             uint i = 0;
             i < stakers[msg.sender][token].length;
@@ -107,74 +107,74 @@ contract SoloStaking is Ownable{
         }
     }
 
-    function donateTokens(uint256 amount) external {
+    function donateTokens(uint256 _amount) external {
 
-        IERC20(token).transferFrom(msg.sender, address(this), amount);
+        IERC20(token).transferFrom(msg.sender, address(this), _amount);
 
-        totalAvailableTokens[token] = totalAvailableTokens[token].add(amount);
+        totalAvailableTokens[token] = totalAvailableTokens[token].add(_amount);
 
-        emit tokenDonated(msg.sender, amount);
+        emit tokenDonated(msg.sender, _amount);
     }
 
-    function calculateReward(uint256 amount, uint256 delay) internal returns(uint256){
-        uint256 baseReward = amount.mul(APY).mul(delay).div(365).div(DENOMINATOR);
+    function calculateReward(uint256 _amount, uint256 delay) internal returns(uint256){
+        uint256 baseReward = _amount.mul(APY).mul(delay).div(365).div(DENOMINATOR);
         
         if(delay < 14){
-            uint256 bonusReward = amount.mul(APYBonus_7).mul(delay).div(365).div(DENOMINATOR);
+            uint256 bonusReward = _amount.mul(APYBonus_7).mul(delay).div(365).div(DENOMINATOR);
             return baseReward.add(bonusReward);
         }
         if(delay < 30){
-            uint256 bonusReward = amount.mul(APYBonus_14).mul(delay).div(365).div(DENOMINATOR);
+            uint256 bonusReward = _amount.mul(APYBonus_14).mul(delay).div(365).div(DENOMINATOR);
             return baseReward.add(bonusReward);
         }
         if(delay < 60){
-            uint256 bonusReward = amount.mul(APYBonus_30).mul(delay).div(365).div(DENOMINATOR);
+            uint256 bonusReward = _amount.mul(APYBonus_30).mul(delay).div(365).div(DENOMINATOR);
             return baseReward.add(bonusReward);
         }
         if(delay < 180){
-            uint256 bonusReward = amount.mul(APYBonus_60).mul(delay).div(365).div(DENOMINATOR);
+            uint256 bonusReward = _amount.mul(APYBonus_60).mul(delay).div(365).div(DENOMINATOR);
             return baseReward.add(bonusReward);
         }
         if(delay < 360){
-            uint256 bonusReward = amount.mul(APYBonus_180).mul(delay).div(365).div(DENOMINATOR);
+            uint256 bonusReward = _amount.mul(APYBonus_180).mul(delay).div(365).div(DENOMINATOR);
             return baseReward.add(bonusReward);
         }
 
-        uint256 bonusReward = amount.mul(APYBonus_300).mul(delay).div(365).div(DENOMINATOR);
+        uint256 bonusReward = _amount.mul(APYBonus_300).mul(delay).div(365).div(DENOMINATOR);
             return baseReward.add(bonusReward);
     }
 
     ///ADMINISTRATION
     
-    function burnTokens(address token, address destination) external onlyOwner{
-        uint256 availableTokens = totalAvailableTokens[token].sub(totalSoldTokens[token]);
+    function burnTokens(address _token, address destination) external onlyOwner{
+        uint256 availableTokens = totalAvailableTokens[_token].sub(totalSoldTokens[_token]);
 
-        IERC20(token).approve(destination, type(uint256).max);
-        IERC20(token).transfer(destination, availableTokens);
-        IERC20(token).approve(destination, uint256(0));
+        IERC20(_token).approve(destination, type(uint256).max);
+        IERC20(_token).transfer(destination, availableTokens);
+        IERC20(_token).approve(destination, uint256(0));
 
-        totalAvailableTokens[token] = 0;
+        totalAvailableTokens[_token] = 0;
 
         emit tokensBurned(destination, availableTokens);
     }
 
-    function changeToken(address newToken) external onlyOwner{
-        require(newToken !=address(0), 'New token address cannot be zero');
+    function changeToken(address _newToken) external onlyOwner{
+        require(_newToken !=address(0), 'New token address cannot be zero');
 
-        emit tokenChanged(token, newToken);
+        emit tokenChanged(token, _newToken);
 
-        token = newToken;
+        token = _newToken;
 
         if(totalSoldTokens[token] == 0){
             totalAvailableTokens[token] = IERC20(token).balanceOf(address(this));
         }
     }
 
-    function changeOwner(address newOwner) external onlyOwner{
+    function changeOwner(address _newOwner) external onlyOwner{
 
-        transferOwnership(newOwner);
+        transferOwnership(_newOwner);
 
-        emit OwnershipTransferred(msg.sender, newOwner);
+        emit OwnershipTransferred(msg.sender, _newOwner);
     }
 
     function changeAPY(uint256 _APY) external onlyOwner{
